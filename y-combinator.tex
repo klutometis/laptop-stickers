@@ -1,0 +1,16 @@
+%% Can't seem to use `standalone`.
+\documentclass{article}
+\pagestyle{empty}
+\usepackage{amsmath}
+\usepackage{semantic}
+\mathlig{:}{\!:}
+\mathlig{.}{.\:}
+\newcommand{\f}{\operatorname{f}}
+\begin{document}
+
+\begin{align*}
+  \textsf{Y} = \lambda f.\,&(\lambda x.f\,(x\, x)) \\
+                   \,&(\lambda x.f\,(x\, x))
+\end{align*}
+
+\end{document}
