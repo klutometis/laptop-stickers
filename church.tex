@@ -1,4 +1,5 @@
 \documentclass{article}
+\pagestyle{empty}
 \usepackage{amsmath}
 \usepackage{semantic}
 \mathlig{:}{\!:}
@@ -7,12 +8,12 @@
 \begin{document}
 
 \begin{gather*}
-\lambda f.\lambda x.x \\
-\lambda f.\lambda x.f\, x \\
-\lambda f.\lambda x.f\, (f\, x) \\
-\lambda f.\lambda x.f\, (f\, (f\, x)) \\
-\vdots \\
-\lambda f.\lambda x.f^{\circ n}\, x
+	\lambda f.\lambda x.x \\
+	\lambda f.\lambda x.f\, x \\
+	\lambda f.\lambda x.f\, (f\, x) \\
+	\lambda f.\lambda x.f\, (f\, (f\, x)) \\
+	\vdots \\
+	\lambda f.\lambda x.f^{\circ n}\, x
 \end{gather*}
 
 \end{document}

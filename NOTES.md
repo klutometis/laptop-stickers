@@ -218,6 +218,206 @@ Since this is a permanent laptop sticker seen daily, getting the musical archite
 
 ---
 
+## Color Decision: D# Minor and the Case for Silver
+
+**Date:** 2026-04-11
+**Prompt:** "I don't know if it's a Latvian thing or whatever; but all of my jewelry (namejs ring, etc.) has always been silver; gold has always looked somewhat alien. I don't natively identify with it. I'm not sure whether that means to go silver or whatever... I just wish there was some mechanism to make it feel less arbitrary. When I was in college, I remember there was some wooish synaesthetic key / color association that someone made. Has anyone 'assigned' a color to D# minor or D# by itself?"
+
+### Scriabin's Color System (Clavier a Lumieres)
+
+Alexander Scriabin created a tone-to-color mapping for his orchestral work *Prometheus: Poem of Fire* (1910), played on a "clavier a lumieres" (keyboard of lights). His system maps the circle of fifths to the visible spectrum.
+
+**D# (Eb) = "flesh" with a "glint of steel"**
+
+Full Scriabin mapping (chromatic):
+
+| Note | Color |
+|------|-------|
+| C | Red (intense) |
+| C# | Violet or purple |
+| D | Yellow |
+| **D#** | **Flesh (glint of steel)** |
+| E | Sky blue (moonshine or frost) |
+| F | Deep red |
+| F# | Bright blue or violet |
+| G | Orange |
+| G# | Violet or lilac |
+| A | Green |
+| A# | Rose or steel |
+| B | Blue or pearly blue |
+
+Scriabin also stated: *"Flat keys have some sort of **metallic sheen**, while sharp keys are bright, saturated with color and without any of the metallic hue."*
+
+Source: Wikipedia "Clavier a lumieres"; Galeyev & Vanechkina (2001) "Was Scriabin a Synesthete?" in *Leonardo* 34(4):357-362.
+
+### Rimsky-Korsakov's Color Associations
+
+Rimsky-Korsakov, who was considered an actual synesthete (unlike Scriabin, whose status is debated), also associated keys with colors.
+
+**Eb major = "bluish-grey" or "steely"**
+
+This is one of the few keys where Scriabin and Rimsky-Korsakov **actually agreed**: both perceived D#/Eb as having a steely, metallic quality. They famously disagreed on most other keys (e.g., C major: Scriabin said red, Rimsky-Korsakov said white; F# major: Scriabin said bright blue, Rimsky-Korsakov said green).
+
+Source: Rachmaninoff's *Recollections*; Tom Douglas Jones, *The Art of Light & Color* (1972); composersdatebook.org archives.
+
+### Schubart's Key Characteristics (1806)
+
+Christian Schubart's *Ideen zu einer Aesthetik der Tonkunst* (1806) assigns emotional/poetic characteristics to every key. On D# minor:
+
+> *"Feelings of the anxiety of the soul's deepest distress, of brooding despair, of blackest depression, of the most gloomy condition of the soul. Every fear, every hesitation of the shuddering heart, breathes out of horrible D# minor. **If ghosts could speak, their speech would approximate this key.**"*
+
+Charpentier (1692) on Eb minor: **"Horrible, frightful."**
+
+### Conclusion: Silver Is the Canonical Color for D# Minor
+
+Both Scriabin and Rimsky-Korsakov converge on **steel / metallic grey-blue** for D#/Eb. This is not arbitrary — it's the one key where the two most famous key-color systems agree, and they both point to the same metallic quality.
+
+The personal affinity for silver (Latvian jewelry tradition, namejs ring, etc.) aligns with the historical-musical association. Silver is not a default or a compromise; it's the *correct* color for this key.
+
+### Color Plan
+
+| Sticker | Color | Rationale |
+|---------|-------|-----------|
+| **Bach D# minor fugue** (bottom) | **Brushed silver / steel** | Scriabin + Rimsky-Korsakov both assign D#/Eb a steely, metallic sheen. Historically grounded. |
+| **Church numerals** (top) | **White** | Pure, clean, maximal contrast on dark laptop. White = pure abstraction. Also contrasts with silver below (matte vs metallic). |
+
+Alternative: Both in silver (unified premium feel, different sizes create visual contrast). But white Church + silver Bach creates a nice texture/luminosity distinction: matte white for the mathematical abstraction, metallic sheen for the musical one.
+
+### The Ghost Line
+
+If anyone asks why silver: *"If ghosts could speak, their speech would approximate this key."* — Schubart, 1806.
+
+Silver is the color of ghosts.
+
+---
+
+## Latin Inscription: "Molesta Placidis, Amica Saevis"
+
+**Date:** 2026-04-12
+
+### Source Text
+
+"Molesta placidis, amica saevis" — a medieval compression of Aesop's fable "The Crow and the Sheep" (Perry Index 553). Translation: "Troublesome to the peaceful, friendly to the savage."
+
+The fable: A crow lands on a sheep's back and the sheep bears it patiently. The crow would never dare land on a dog. The moral: bullies only torment those who won't fight back; they're sycophants to the powerful.
+
+### Layout Concept
+
+Four Latin words flanking the Church numerals in blood red:
+
+```
+MOLESTA       PLACIDIS
+      [Church]
+  AMICA       SAEVIS
+```
+
+The contrast stack:
+- **Font:** Ancient Roman inscriptional majuscule vs. Computer Modern (modern, elegant, mathematical)
+- **Color:** Blood red vs. white
+- **Language:** Latin vs. lambda calculus
+- **Register:** Moral/savage vs. abstract/pure
+- **Era:** 1st century Rome vs. 1936 (Church's paper)
+
+### Font Research
+
+#### Requirements
+- Authentic Roman inscriptional or monumental capitals
+- All-majuscule (caps only)
+- Aggressive visual weight
+- Available as OTF/TTF (for XeLaTeX + fontspec)
+- Must survive vinyl cutting at sticker scale (no hairline strokes)
+
+#### Fonts Evaluated
+
+**Tier 1: Free, immediately available**
+
+1. **Cinzel (Bold/Black)** — Google Font, free (SIL OFL)
+   - Designer: Natanael Gama
+   - Inspired by 1st century Roman inscriptions, modern reinterpretation
+   - Good quality but 3rd-hand from actual Roman sources
+   - Also available: Cinzel Decorative (more ornamental)
+   - On CTAN, LaTeX-ready
+
+2. **ruscap** (Rustic Capitals) — CTAN, free (SIL OFL)
+   - Designer: Victor Sannier, 2024
+   - METAFONT only (no OTF/TTF) — works with pdflatex, not xelatex
+   - Authentic rustic capitals, angular and compressed
+   - Tested: works but bitmap rendering (METAFONT pk fonts), not vector-quality
+
+**Tier 2: Premium**
+
+3. **Pietra LP** — LetterPerfect, $39 (MyFonts) ← CHOSEN
+   - Designer: Garrett Boge, 1996
+   - Based on the **five-foot-tall mosaic lettering in St. Peter's Basilica, Rome**
+   - Original research in Rome — 1st-hand source
+   - All-majuscule, heavy monumental strokes, sharp serifs
+   - Includes small caps (scaled to mimic foreshortened view from basilica floor)
+   - OpenType: stylistic alternates, swashes, contextual ligatures, titling variants
+   - OTF format — works with XeLaTeX + fontspec
+   - **Best for vinyl cutting:** thick confident strokes, no hairlines
+   - https://www.myfonts.com/collections/pietra-font-letterperfect
+
+4. **Cresci** — LetterPerfect, ~$39
+   - Designer: Garrett Boge + Giovan Francesco Cresci (16th c. Vatican calligrapher)
+   - Elegant, calligraphic, delicate hairlines
+   - Beautiful but too refined for this project; hairlines would not survive cutting
+   - Better suited for formal invitations than aggressive moral philosophy
+
+5. **Pontif** — LetterPerfect, ~$39
+   - Designer: Garrett Boge
+   - Middle ground between Pietra and Cresci
+   - Dignified but not aggressive enough for the contrast we want
+
+6. **Trajan Pro 3** — Adobe, ~$35/style
+   - Designer: Carol Twombly, 1989
+   - Based on Trajan's Column (via photographs — 2nd-hand)
+   - Six weights, Extra Light to Black
+   - Canonical Roman inscriptional font but overused (every Hollywood epic poster)
+
+7. **Stevens Titling** — Linotype, ~$35/style
+   - Designers: John Stevens + Ryuichi Tateno, 2011
+   - Takes inscriptional capitals "back to their brush-painted roots"
+   - Four variants: Sable Brush, Flat Nib, Pointed Pen, etc.
+   - Organic texture from brush origin — viscerally aggressive
+   - 1st-hand (process-authentic: recreates the brush technique that preceded carving)
+
+8. **Augustea** — various foundries, ~$20-35
+   - Designers: Aldo Novarese + Alessandro Butti, 1951 (Nebiolo foundry)
+   - Named after Augustus — imperial register
+   - Elegant but less aggressive
+
+9. **PKG Roman Capitals** — Fontspring, ~$22
+   - Designer: Lazar Dimitrijević
+   - Scholarly, educational feel
+   - Full Latin + Cyrillic
+
+10. **Juan-José Marcos paleographic fonts** — typofonts.com, €20/font or €120 for 20
+    - Professor of classical languages (Plasencia, Spain)
+    - Facsimile-level reconstructions: Capitalis Rustica, Elegans, Monumentalis, etc.
+    - Most historically authentic *manuscript* reproductions available
+    - Not TTF-native in the usual sense; aimed at paleography scholars
+
+#### Provenance Chain (degree of separation from Rome)
+
+| Font | Source | Separation |
+|------|--------|------------|
+| Pietra | Boge studying mosaics in St. Peter's directly | **1st hand** |
+| Pontif/Cresci | Boge's original research in Rome | **1st hand** |
+| Stevens Titling | Master calligrapher recreating Roman brush technique | **1st hand (process)** |
+| Trajan Pro | Twombly studying *photographs* of Trajan's Column | 2nd hand |
+| Cinzel | Gama *inspired by* Roman inscriptions, modern reinterpretation | 3rd hand |
+
+#### Decision: Pietra LP
+
+Pietra wins on every axis:
+1. **Provenance:** 1st-hand research at St. Peter's Basilica
+2. **Weight:** Heavy monumental strokes survive vinyl cutting
+3. **Contrast:** Maximum visual contrast with delicate Computer Modern lambdas
+4. **Naming:** "Pietra" = stone. The inscription *is* stone.
+5. **Price:** $39 is reasonable for a historically researched, single-designer font
+
+---
+
 ## Future Experiments
 
 _Document additional technical findings here as they emerge..._

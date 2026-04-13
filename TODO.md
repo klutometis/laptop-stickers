@@ -2,10 +2,11 @@
 
 ## Layout Plan
 
-Same layout as old laptop:
-- **Top horizontal:** Y-combinator in metallic silver or white
+- **Top center:** Church numerals in metallic silver or white — the widening pyramid has natural visual weight and symmetry
 - **Center cluster:** Random life stickers (skate, conference swag, whatever accumulates organically)
-- **Bottom horizontal:** D♯ minor fugue in brushed metallic gold
+- **Bottom horizontal:** D♯ minor fugue (3-measure version: exposition + answer) in brushed metallic gold
+
+Visual hierarchy: abstract math principle (top) -> messy life (middle) -> concrete musical expression (bottom)
 
 ## Workflow Options
 
@@ -67,14 +68,15 @@ Use the LilyPond → rasterize → vectorize workflow:
   - **If doing F♯ experiment:** Print both versions (current + extended) for comparison
 - [ ] **Decide workflow**: Peters scan vs LilyPond (or compare both)
 - [ ] **Generate D♯ minor fugue sticker** (brushed metallic gold)
-- [ ] **Print Y-combinator sticker** (brushed metallic silver or white)
+- [x] **Generate Church numerals sticker** (clean SVG/PNG via tex-to-sticker.sh, no page number)
+- [ ] **Print Church numerals sticker** (brushed metallic silver or white)
 - [ ] **Collect random stickers** from conferences/skate shops
 - [ ] **Apply in planned layout**
 
 ## Design Notes
 
 - **Color scheme**: Brushed metallic silver + brushed metallic gold (or white + gold)
-  - Silver/white Y-combinator = cold/logical/computational
+  - Silver/white Church numerals = cold/logical/computational
   - Gold fugue = warm/classical/artistic
   - Metallics photograph better and add premium feel
 - **Intentional structure** on edges (math top, music bottom)
@@ -90,3 +92,4 @@ See **NOTES.md** for detailed technical findings, experiments, and lessons learn
 - Use `sharp` preset for music notation vectorization: `./png-to-svg-potrace.sh input.png output sharp`
 - Peters PNG → potrace workflow produces clean, cuttable SVGs
 - LilyPond needs thickening overrides for vinyl cutting
+- LaTeX sticker pipeline: `./tex-to-sticker.sh input.tex [dpi]` → cropped PDF + SVG + PNG

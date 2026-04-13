@@ -1,0 +1,25 @@
+\documentclass{article}
+\pagestyle{empty}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{fontspec}
+\usepackage{xcolor}
+
+% Load Pietra LP from local file
+\newfontfamily\pietra{PietraLP}[
+  Path=fonts/,
+  Extension=.otf,
+  Ligatures=TeX,
+]
+
+% Blood red
+\definecolor{bloodred}{RGB}{136,8,8}
+
+\begin{document}
+
+\begin{center}
+	{\pietra\color{bloodred}\fontsize{28}{34}\selectfont
+		MOLESTA\hspace{3em}PLACIDIS\\[2.5em]
+		AMICA\hspace{3.6em}SAEVIS}
+\end{center}
+
+\end{document}

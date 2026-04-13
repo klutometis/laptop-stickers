@@ -2,3 +2,21 @@
 .agent-shell*
 mcp-shell*
 wtc-ii.pdf
+
+# Licensed fonts (do not distribute)
+fonts/PietraLP.otf
+fonts/Licenses/
+myfonts_order_*.zip
+
+# LaTeX intermediaries
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+indent.log
+
+# Inkscape backups
+*.bak0
+*.bak1
+*.bak2

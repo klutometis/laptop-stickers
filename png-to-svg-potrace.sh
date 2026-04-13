@@ -113,9 +113,21 @@ potrace "$TMP_PNM" --svg -o "${OUTPUT_NAME}.svg" \
 # Step 3: Clean up temporary file
 rm -f "$TMP_PNM"
 
-# Step 4: Create a preview PNG from the SVG (for comparison)
+# Step 4: Trim SVG to ink bounds (remove whitespace — critical for Cricut sizing)
+if command -v inkscape &> /dev/null; then
+    echo "Trimming SVG to ink bounds..."
+    inkscape "${OUTPUT_NAME}.svg" \
+        --export-area-drawing \
+        --export-type=svg \
+        --export-filename="${OUTPUT_NAME}.svg" \
+        --export-overwrite 2>/dev/null
+else
+    echo "Warning: inkscape not found, skipping SVG trim (whitespace may remain)"
+fi
+
+# Step 5: Create a preview PNG from the SVG (for comparison)
 PREVIEW_PNG="${OUTPUT_NAME}-vectorized.png"
 convert "${OUTPUT_NAME}.svg" "$PREVIEW_PNG"
 
-echo "Success! Created ${OUTPUT_NAME}.svg"
+echo "Success! Created ${OUTPUT_NAME}.svg (trimmed to ink bounds)"
 echo "Preview PNG: $PREVIEW_PNG"
