@@ -23,17 +23,29 @@ export const TEXT_MODELS: Record<
   },
 };
 
+// Per-model size config: Google takes `aspectRatio`, OpenAI takes `size`.
+// We spread this directly into generateImage().
+type ImageSizeParams =
+  | { aspectRatio: `${number}:${number}` }
+  | { size: `${number}x${number}` };
+
 export const IMAGE_MODELS: Record<
   ImageModelKey,
-  { label: string; build: () => ReturnType<typeof openai.image> }
+  {
+    label: string;
+    build: () => ReturnType<typeof openai.image>;
+    sizeParams: ImageSizeParams;
+  }
 > = {
   "nano-banana-2": {
     label: "Nano Banana 2",
     build: () => google.image("gemini-3.1-flash-image-preview"),
+    sizeParams: { aspectRatio: "1:1" },
   },
   "gpt-image-2": {
     label: "GPT Image 2",
     build: () => openai.image("gpt-image-2"),
+    sizeParams: { size: "1024x1024" },
   },
 };
 

@@ -1,12 +1,12 @@
 import { experimental_generateImage as generateImage } from "ai";
 import { z } from "zod";
 import { IMAGE_MODELS, type ImageModelKey } from "@/lib/models";
+import { asyncChannel, ndjsonResponse } from "@/lib/ndjson";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const Body = z.object({
-  // [{ promptModel, prompt }]
   prompts: z
     .array(z.object({ promptModel: z.string(), prompt: z.string().min(1) }))
     .min(1),
@@ -14,11 +14,21 @@ const Body = z.object({
   n: z.number().int().min(1).max(8).default(4),
 });
 
-type Cell = {
-  promptModel: string;
-  imageModel: string;
-  images: Array<{ base64: string } | { error: string }>;
-};
+export type ImageEvent =
+  | {
+      type: "image";
+      promptModel: string;
+      imageModel: string;
+      idx: number;
+      base64: string;
+    }
+  | {
+      type: "error";
+      promptModel: string;
+      imageModel: string;
+      idx: number;
+      error: string;
+    };
 
 export async function POST(req: Request) {
   const json = await req.json();
@@ -28,55 +38,64 @@ export async function POST(req: Request) {
   }
   const { prompts, imageModels, n } = parsed.data;
 
-  // Cartesian product: each prompt × each image model × n images
-  const cellTasks: Array<() => Promise<Cell>> = [];
+  const ch = asyncChannel<ImageEvent>();
+
+  // Build per-image tasks (cartesian product × n).
+  const tasks: Array<() => Promise<void>> = [];
   for (const p of prompts) {
     for (const imKey of imageModels) {
-      cellTasks.push(async () => {
-        const cfg = IMAGE_MODELS[imKey as ImageModelKey];
-        if (!cfg)
-          return {
-            promptModel: p.promptModel,
-            imageModel: imKey,
-            images: Array.from({ length: n }, () => ({
+      for (let idx = 0; idx < n; idx++) {
+        const i = idx;
+        tasks.push(async () => {
+          const cfg = IMAGE_MODELS[imKey as ImageModelKey];
+          if (!cfg) {
+            ch.push({
+              type: "error",
+              promptModel: p.promptModel,
+              imageModel: imKey,
+              idx: i,
               error: `unknown image model: ${imKey}`,
-            })),
-          };
-        // n parallel calls (Gemini doesn't support n parameter; uniform pattern)
-        const calls = await Promise.allSettled(
-          Array.from({ length: n }, () =>
-            generateImage({
+            });
+            return;
+          }
+          try {
+            const result = await generateImage({
               model: cfg.build(),
               prompt: p.prompt,
-              aspectRatio: "1:1",
-            }),
-          ),
-        );
-        return {
-          promptModel: p.promptModel,
-          imageModel: imKey,
-          images: calls.map((c) =>
-            c.status === "fulfilled"
-              ? { base64: c.value.image.base64 }
-              : { error: String(c.reason?.message ?? c.reason) },
-          ),
-        };
-      });
+              ...cfg.sizeParams,
+            });
+            ch.push({
+              type: "image",
+              promptModel: p.promptModel,
+              imageModel: imKey,
+              idx: i,
+              base64: result.image.base64,
+            });
+          } catch (err) {
+            ch.push({
+              type: "error",
+              promptModel: p.promptModel,
+              imageModel: imKey,
+              idx: i,
+              error: String((err as Error)?.message ?? err),
+            });
+          }
+        });
+      }
     }
   }
 
-  // Throttle to 4 concurrent cell-tasks to avoid hammering rate limits
-  const cells: Cell[] = [];
+  // Concurrency-limited worker pool; close channel when all tasks finish.
   const concurrency = 4;
-  let i = 0;
-  await Promise.all(
+  let cursor = 0;
+  Promise.all(
     Array.from({ length: concurrency }, async () => {
-      while (i < cellTasks.length) {
-        const idx = i++;
-        cells[idx] = await cellTasks[idx]();
+      while (cursor < tasks.length) {
+        const idx = cursor++;
+        await tasks[idx]();
       }
     }),
-  );
+  ).finally(() => ch.close());
 
-  return Response.json({ cells });
+  return ndjsonResponse(ch);
 }

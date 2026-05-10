@@ -6,12 +6,24 @@ Idea → prompt → image → monochrome → SVG, end-to-end. See
 ## Setup
 
 ```bash
-cp .env.local.example .env.local   # then fill in the keys
 npm install
 npm run dev
 ```
 
-System dependencies (already present on this machine):
+### API keys
+
+The app reads these from `process.env`:
+
+- `ANTHROPIC_API_KEY`
+- `OPENAI_API_KEY`
+- `GOOGLE_GENERATIVE_AI_API_KEY`
+
+If they're already exported in your shell (e.g. sourced from `~/.env`), Next.js
+picks them up directly — no `.env.local` needed. Otherwise, copy
+`.env.local.example` to `.env.local` and fill them in.
+
+### System dependencies
+
 - `potrace` (Ubuntu: `sudo apt install potrace`)
 - `inkscape` (Ubuntu: `sudo apt install inkscape`)
 - `convert` from ImageMagick (Ubuntu: `sudo apt install imagemagick`)

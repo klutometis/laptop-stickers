@@ -67,16 +67,21 @@ pattern works for OpenAI — keep it uniform across providers.
 ### 1. Idea → Refined prompt
 - Free-text input ("sun and cloud for Eos's laptop").
 - User multi-selects from text models.
-- For each selected model: call `generateText` with a system prompt tuned for
-  vinyl-cutout sticker constraints (flat fills, separable shapes, clean
-  outlines, white background — see "Prompt strategy" below).
-- Show all refined prompts side by side.
-- User edits any of them inline, picks which ones to feed forward.
+- For each selected model: call `generateObject` (streaming) with a system
+  prompt tuned for vinyl-cutout sticker constraints (flat fills, separable
+  shapes, clean outlines, white background — see "Prompt strategy" below) and
+  a Zod schema enforcing `{ prompt, aspect, rationale }`.
+- The `aspect` is a semantic bucket the refining model picks based on the
+  subject (see "Aspect ratio buckets" below).
+- Show all refined prompts side by side, with the chosen aspect + rationale.
+  User can edit prompt and override aspect via dropdown.
 
 ### 2. Refined prompts → Generated images
 - User multi-selects from image models. User picks *n* (default 4).
 - Run the Cartesian product: each selected prompt × each selected image model
-  × *n* images = grid.
+  × *n* images = grid. Aspect ratio comes from the refined prompt's bucket;
+  same row = same aspect across image-models for fair comparison.
+- Per-provider param mapping happens server-side (see "Aspect ratio buckets").
 - Display as a table: rows = prompt-model (which prompt was used), columns =
   image-model. Each cell shows *n* thumbnails.
 - Click any thumbnail to select it for the next step. Regenerate any cell
@@ -102,6 +107,31 @@ pattern works for OpenAI — keep it uniform across providers.
 - User welds in Cricut Design Space afterward (no CLI for Cricut).
 
 ---
+
+## Aspect ratio buckets
+
+The refining model in step 1 picks one of five semantic buckets. The server
+maps to per-provider params before calling `generateImage`.
+
+| bucket | Gemini (NB2) | OpenAI (gpt-image-2) | use case |
+|---|---|---|---|
+| `square` | `1:1` | `1024x1024` | default; logos, icons, single-subject |
+| `landscape` | `3:2` | `1536x1024` | wider-than-tall scenes |
+| `portrait` | `2:3` | `1024x1536` | taller-than-wide subjects |
+| `panorama` | `21:9` | `2304x1024` (~9:4, OpenAI's max within 3:1) | wide banner |
+| `banner` | `4:1` | `2304x1024` (degraded — OpenAI caps at 3:1) | Gemini-only ribbon shapes (e.g. music staffs) |
+
+**Notes:**
+- OpenAI's `size` is capped at ratio ≤ 3:1, so `banner` (4:1) gracefully
+  degrades to OpenAI's wider panorama. UI should note this in the cell.
+- Resolution stays at ~1K everywhere. Laptop stickers don't need 4K and
+  Nano Banana Pro tokens add up fast.
+- We don't use OpenAI's `size: "auto"` mode — even though it works for OAI,
+  it makes side-by-side comparison messier (each cell would have a different
+  shape). Explicit bucket → concrete params keeps the grid coherent.
+- The Bach fugue from `plans/thinkpad-x1-carbon-2026.md` is 9.5:1 — beyond
+  even `banner`. For shapes like that, generate at `banner` and crop, or skip
+  the pipeline and use the existing potrace workflow on a Peters scan.
 
 ## Prompt strategy (for the system prompt in step 1)
 

@@ -9,6 +9,9 @@ import {
   type TextModelKey,
   type ImageModelKey,
 } from "@/lib/models";
+import { readNdjson } from "@/lib/ndjson";
+import type { RefineEvent } from "./api/refine-prompt/route";
+import type { ImageEvent } from "./api/generate-images/route";
 
 type RefinedPrompt = {
   model: string;
@@ -63,22 +66,34 @@ export default function Page() {
 
   async function refine() {
     setRefining(true);
-    setRefined(null);
-    setPickedPromptIdx(new Set());
+    // Pre-seed one empty entry per selected model; deltas append as they stream
+    const initial = selectedTextModels.map((m) => ({ model: m, prompt: "" }));
+    setRefined(initial);
+    setPickedPromptIdx(new Set(initial.map((_, i) => i)));
     try {
       const res = await fetch("/api/refine-prompt", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ idea, models: selectedTextModels }),
       });
-      const data = await res.json();
-      setRefined(data.results);
-      // pre-select all successful prompts
-      const picked = new Set<number>();
-      (data.results as RefinedPrompt[]).forEach((r, i) => {
-        if (r.prompt && !r.error) picked.add(i);
-      });
-      setPickedPromptIdx(picked);
+      for await (const ev of readNdjson<RefineEvent>(res)) {
+        if (ev.type === "delta") {
+          setRefined((prev) =>
+            prev?.map((r) =>
+              r.model === ev.model
+                ? { ...r, prompt: (r.prompt ?? "") + ev.text }
+                : r,
+            ) ?? null,
+          );
+        } else if (ev.type === "error") {
+          setRefined((prev) =>
+            prev?.map((r) =>
+              r.model === ev.model ? { ...r, error: ev.error } : r,
+            ) ?? null,
+          );
+        }
+        // 'done' is informational; we already have the full text from deltas
+      }
     } finally {
       setRefining(false);
     }
@@ -93,18 +108,47 @@ export default function Page() {
     if (!prompts.length) return;
 
     setGenerating(true);
-    setGrid(null);
     setSelectedImage(null);
     setMonoBase64(null);
     setSvg(null);
+
+    // Pre-seed empty grid so cells render immediately and fill in as images arrive
+    const initialCells: Cell[] = [];
+    for (const p of prompts) {
+      for (const im of selectedImageModels) {
+        initialCells.push({
+          promptModel: p.promptModel,
+          imageModel: im,
+          images: Array.from({ length: n }, () => ({})),
+        });
+      }
+    }
+    setGrid(initialCells);
+
     try {
       const res = await fetch("/api/generate-images", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompts, imageModels: selectedImageModels, n }),
       });
-      const data = await res.json();
-      setGrid(data.cells);
+      for await (const ev of readNdjson<ImageEvent>(res)) {
+        setGrid((prev) =>
+          prev?.map((c) =>
+            c.promptModel === ev.promptModel && c.imageModel === ev.imageModel
+              ? {
+                  ...c,
+                  images: c.images.map((img, i) =>
+                    i === ev.idx
+                      ? ev.type === "image"
+                        ? { base64: ev.base64 }
+                        : { error: ev.error }
+                      : img,
+                  ),
+                }
+              : c,
+          ) ?? null,
+        );
+      }
     } finally {
       setGenerating(false);
     }
@@ -338,13 +382,18 @@ export default function Page() {
                                     className="w-32 h-32 object-cover"
                                   />
                                 </button>
-                              ) : (
+                              ) : img.error ? (
                                 <div
                                   key={idx}
                                   className="w-32 h-32 bg-red-100 text-red-600 text-xs p-1 flex items-center justify-center text-center"
                                 >
-                                  {img.error ?? "error"}
+                                  {img.error}
                                 </div>
+                              ) : (
+                                <div
+                                  key={idx}
+                                  className="w-32 h-32 bg-gray-100 animate-pulse rounded"
+                                />
                               ),
                             )}
                           </div>
