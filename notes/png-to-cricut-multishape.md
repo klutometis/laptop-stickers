@@ -56,12 +56,43 @@ as a single piece.
 
 ---
 
-## Future experiments
+## Future experiments: prompt strategy for cleaner vectorization
 
-- **Monochrome from the prompt**: ask the model for black-and-white outlines from
-  the start. Risk: may constrain the model's composition creativity.
-- **Model for the monochrome step**: instead of GIMP, feed the colored output back
-  into Nano Banana / img2img to convert to flat monochrome before tracing.
+The current prompt is heavy on negative directives (*no gradients, no shading, no
+shadows*). Diffusion models are trained on colorful, shaded, detailed imagery —
+those directives swim upstream against the model's priors, which is likely why the
+sun leaked a yellow→white gradient anyway.
+
+### Two-pass approach (recommended to try)
+
+**Pass 1 — permissive geometry prompt.** Constrain only the structure, not the
+color. Let the model be creative. Something like:
+
+> *Flat graphic illustration for a vinyl sticker. [subject]. Two clearly distinct
+> bold shapes with a visible gap between them. Solid flat fills, thick clean
+> outlines, white background.*
+
+No negative directives. Flat cartoon shapes come naturally when the subject calls
+for it.
+
+**Pass 2 — mechanical monochrome, no model needed.** If Pass 1 produces flat solid
+fills (not gradients), a simple threshold does the job — no GIMP:
+
+```bash
+convert input.png -threshold 50% output-bw.png
+```
+
+The gradient only required manual GIMP work because Pass 1 leaked shading. Fix the
+prompt and the monochrome step becomes a one-liner.
+
+**Pass 2 fallback — model-assisted monochrome.** If gradients still leak, feed the
+output back into Nano Banana: *"convert this to flat black silhouettes on white
+background, no color, no gradients."* Use this only if the threshold approach fails.
+
+### Monochrome from the start (alternative)
+
+Ask for B&W outlines in the initial prompt. Simpler pipeline, but risks
+constrained composition — worth a test but two-pass is the safer bet.
 
 ---
 
