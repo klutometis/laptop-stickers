@@ -1,6 +1,12 @@
 import { experimental_generateImage as generateImage } from "ai";
 import { z } from "zod";
-import { IMAGE_MODELS, type ImageModelKey } from "@/lib/models";
+import {
+  IMAGE_MODELS,
+  ASPECT_BUCKETS,
+  imageSizeFor,
+  type ImageModelKey,
+  type AspectBucket,
+} from "@/lib/models";
 import { asyncChannel, ndjsonResponse } from "@/lib/ndjson";
 
 export const runtime = "nodejs";
@@ -8,7 +14,13 @@ export const maxDuration = 300;
 
 const Body = z.object({
   prompts: z
-    .array(z.object({ promptModel: z.string(), prompt: z.string().min(1) }))
+    .array(
+      z.object({
+        promptModel: z.string(),
+        prompt: z.string().min(1),
+        aspect: z.enum(ASPECT_BUCKETS),
+      }),
+    )
     .min(1),
   imageModels: z.array(z.string()).min(1),
   n: z.number().int().min(1).max(8).default(4),
@@ -40,7 +52,6 @@ export async function POST(req: Request) {
 
   const ch = asyncChannel<ImageEvent>();
 
-  // Build per-image tasks (cartesian product × n).
   const tasks: Array<() => Promise<void>> = [];
   for (const p of prompts) {
     for (const imKey of imageModels) {
@@ -59,10 +70,14 @@ export async function POST(req: Request) {
             return;
           }
           try {
+            const sizeParams = imageSizeFor(
+              imKey as ImageModelKey,
+              p.aspect as AspectBucket,
+            );
             const result = await generateImage({
               model: cfg.build(),
               prompt: p.prompt,
-              ...cfg.sizeParams,
+              ...sizeParams,
             });
             ch.push({
               type: "image",
@@ -85,7 +100,6 @@ export async function POST(req: Request) {
     }
   }
 
-  // Concurrency-limited worker pool; close channel when all tasks finish.
   const concurrency = 4;
   let cursor = 0;
   Promise.all(

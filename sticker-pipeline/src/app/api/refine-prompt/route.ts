@@ -1,6 +1,11 @@
-import { streamText } from "ai";
+import { streamObject } from "ai";
 import { z } from "zod";
-import { TEXT_MODELS, type TextModelKey } from "@/lib/models";
+import {
+  TEXT_MODELS,
+  ASPECT_BUCKETS,
+  type TextModelKey,
+  type AspectBucket,
+} from "@/lib/models";
 import { STICKER_SYSTEM_PROMPT } from "@/lib/sticker-prompt";
 import { asyncChannel, ndjsonResponse } from "@/lib/ndjson";
 
@@ -12,9 +17,31 @@ const Body = z.object({
   models: z.array(z.string()).min(1),
 });
 
+const RefinedSchema = z.object({
+  prompt: z
+    .string()
+    .describe(
+      "The image-generation prompt, single paragraph, 60-150 words. Describe the desired flat/graphic style positively. No negative directives.",
+    ),
+  aspect: z
+    .enum(ASPECT_BUCKETS)
+    .describe(
+      "Aspect ratio bucket that fits the subject's natural shape. Default to 'square'.",
+    ),
+  rationale: z
+    .string()
+    .describe("One short sentence explaining the aspect choice."),
+});
+
+export type RefinedObject = z.infer<typeof RefinedSchema>;
+
 export type RefineEvent =
-  | { type: "delta"; model: string; text: string }
-  | { type: "done"; model: string }
+  | {
+      type: "partial";
+      model: string;
+      partial: Partial<RefinedObject>;
+    }
+  | { type: "done"; model: string; object: RefinedObject }
   | { type: "error"; model: string; error: string };
 
 export async function POST(req: Request) {
@@ -27,7 +54,6 @@ export async function POST(req: Request) {
 
   const ch = asyncChannel<RefineEvent>();
 
-  // Kick off all model streams in parallel; close the channel when all done.
   Promise.all(
     models.map(async (key) => {
       const cfg = TEXT_MODELS[key as TextModelKey];
@@ -36,15 +62,21 @@ export async function POST(req: Request) {
         return;
       }
       try {
-        const { textStream } = streamText({
+        const { partialObjectStream, object } = streamObject({
           model: cfg.build(),
+          schema: RefinedSchema,
           system: STICKER_SYSTEM_PROMPT,
           prompt: idea,
         });
-        for await (const delta of textStream) {
-          ch.push({ type: "delta", model: key, text: delta });
+        for await (const partial of partialObjectStream) {
+          ch.push({
+            type: "partial",
+            model: key,
+            partial: partial as Partial<RefinedObject>,
+          });
         }
-        ch.push({ type: "done", model: key });
+        const final = await object;
+        ch.push({ type: "done", model: key, object: final });
       } catch (err) {
         ch.push({
           type: "error",
@@ -57,3 +89,7 @@ export async function POST(req: Request) {
 
   return ndjsonResponse(ch);
 }
+
+// Re-export for the client to import the AspectBucket type without
+// pulling in server-only modules.
+export type { AspectBucket };

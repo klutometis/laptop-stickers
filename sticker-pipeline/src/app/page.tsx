@@ -6,8 +6,11 @@ import {
   IMAGE_MODELS,
   TEXT_MODEL_KEYS,
   IMAGE_MODEL_KEYS,
+  ASPECT_BUCKETS,
+  ASPECT_LABELS,
   type TextModelKey,
   type ImageModelKey,
+  type AspectBucket,
 } from "@/lib/models";
 import { readNdjson } from "@/lib/ndjson";
 import type { RefineEvent } from "./api/refine-prompt/route";
@@ -16,6 +19,8 @@ import type { ImageEvent } from "./api/generate-images/route";
 type RefinedPrompt = {
   model: string;
   prompt?: string;
+  aspect?: AspectBucket;
+  rationale?: string;
   error?: string;
 };
 
@@ -66,8 +71,10 @@ export default function Page() {
 
   async function refine() {
     setRefining(true);
-    // Pre-seed one empty entry per selected model; deltas append as they stream
-    const initial = selectedTextModels.map((m) => ({ model: m, prompt: "" }));
+    // Pre-seed one empty entry per selected model; partial objects fill in as they stream
+    const initial: RefinedPrompt[] = selectedTextModels.map((m) => ({
+      model: m,
+    }));
     setRefined(initial);
     setPickedPromptIdx(new Set(initial.map((_, i) => i)));
     try {
@@ -77,11 +84,30 @@ export default function Page() {
         body: JSON.stringify({ idea, models: selectedTextModels }),
       });
       for await (const ev of readNdjson<RefineEvent>(res)) {
-        if (ev.type === "delta") {
+        if (ev.type === "partial") {
           setRefined((prev) =>
             prev?.map((r) =>
               r.model === ev.model
-                ? { ...r, prompt: (r.prompt ?? "") + ev.text }
+                ? {
+                    ...r,
+                    // streamObject yields ever-growing partials; just overwrite
+                    prompt: ev.partial.prompt ?? r.prompt,
+                    aspect: (ev.partial.aspect as AspectBucket) ?? r.aspect,
+                    rationale: ev.partial.rationale ?? r.rationale,
+                  }
+                : r,
+            ) ?? null,
+          );
+        } else if (ev.type === "done") {
+          setRefined((prev) =>
+            prev?.map((r) =>
+              r.model === ev.model
+                ? {
+                    ...r,
+                    prompt: ev.object.prompt,
+                    aspect: ev.object.aspect,
+                    rationale: ev.object.rationale,
+                  }
                 : r,
             ) ?? null,
           );
@@ -92,7 +118,6 @@ export default function Page() {
             ) ?? null,
           );
         }
-        // 'done' is informational; we already have the full text from deltas
       }
     } finally {
       setRefining(false);
@@ -103,8 +128,15 @@ export default function Page() {
     if (!refined) return;
     const prompts = Array.from(pickedPromptIdx)
       .map((i) => refined[i])
-      .filter((r): r is { model: string; prompt: string } => !!r.prompt)
-      .map((r) => ({ promptModel: r.model, prompt: r.prompt }));
+      .filter(
+        (r): r is RefinedPrompt & { prompt: string; aspect: AspectBucket } =>
+          !!r.prompt && !!r.aspect,
+      )
+      .map((r) => ({
+        promptModel: r.model,
+        prompt: r.prompt,
+        aspect: r.aspect,
+      }));
     if (!prompts.length) return;
 
     setGenerating(true);
@@ -269,17 +301,55 @@ export default function Page() {
                 {r.error ? (
                   <div className="text-red-600 text-sm">{r.error}</div>
                 ) : (
-                  <textarea
-                    className="w-full text-sm h-20 bg-background border rounded p-1"
-                    value={r.prompt ?? ""}
-                    onChange={(e) =>
-                      setRefined((prev) =>
-                        prev?.map((p, j) =>
-                          j === i ? { ...p, prompt: e.target.value } : p,
-                        ) ?? null,
-                      )
-                    }
-                  />
+                  <>
+                    <textarea
+                      className="w-full text-sm h-20 bg-background border rounded p-1"
+                      value={r.prompt ?? ""}
+                      onChange={(e) =>
+                        setRefined((prev) =>
+                          prev?.map((p, j) =>
+                            j === i ? { ...p, prompt: e.target.value } : p,
+                          ) ?? null,
+                        )
+                      }
+                    />
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <label className="text-xs text-gray-500 flex items-center gap-1">
+                        aspect:
+                        <select
+                          className="text-xs border rounded p-1 bg-background"
+                          value={r.aspect ?? ""}
+                          onChange={(e) =>
+                            setRefined((prev) =>
+                              prev?.map((p, j) =>
+                                j === i
+                                  ? {
+                                      ...p,
+                                      aspect: e.target
+                                        .value as AspectBucket,
+                                    }
+                                  : p,
+                              ) ?? null,
+                            )
+                          }
+                        >
+                          <option value="" disabled>
+                            —
+                          </option>
+                          {ASPECT_BUCKETS.map((a) => (
+                            <option key={a} value={a}>
+                              {ASPECT_LABELS[a]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {r.rationale && (
+                        <span className="text-xs text-gray-500 italic">
+                          “{r.rationale}”
+                        </span>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             ))}
@@ -379,7 +449,7 @@ export default function Page() {
                                   <img
                                     src={`data:image/png;base64,${img.base64}`}
                                     alt=""
-                                    className="w-32 h-32 object-cover"
+                                    className="w-32 h-32 object-contain bg-white"
                                   />
                                 </button>
                               ) : img.error ? (
