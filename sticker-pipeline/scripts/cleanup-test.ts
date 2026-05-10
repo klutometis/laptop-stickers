@@ -16,20 +16,19 @@ import { openai } from "@ai-sdk/openai";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join } from "node:path";
 
-const DEFAULT_PROMPT = `Flatten this sticker into clean, flat vector-style artwork.
+const DEFAULT_PROMPT = `Flatten this sticker into clean, flat vector-style artwork on a pure white background.
 
-Remove:
+Remove entirely:
+  - The white sticker border / rim / outline around the artwork. There should be NO sticker-shaped white border. The colored artwork should sit directly on the pure white background.
   - Any drop shadow under the sticker.
-  - Any paper-curl shading or 3D/photographic lighting effects on the cloud, sun, or rim.
-  - Any soft gradients, halos, or glow on the white sticker border.
+  - Any paper-curl shading or 3D/photographic lighting effects.
+  - Any soft gradients, halos, or glow.
   - Any speckles, texture, or off-white tones in the background.
 
 Preserve:
-  - The colored artwork itself (sun, cloud, faces, outlines) exactly as designed — same colors, same shapes, same proportions.
-  - The white sticker border around the artwork, but as a flat pure-white shape with a sharp, crisp outer edge.
-  - The composition and placement.
+  - The colored artwork itself (sun, cloud, faces, internal black outlines) exactly as designed — same colors, same shapes, same proportions, same composition and placement.
 
-The result should look like clean digital vector art on a pure white background — flat fills, sharp edges, no 3D effects, ready to print.`;
+The result should look like clean digital vector art floating on pure white — flat fills, sharp edges, no sticker border, no 3D effects, ready to print. Cricut's offset tool will add the sticker rim later; we don't need it baked into the image.`;
 
 async function generate(
   modelFn: () => Parameters<typeof generateImage>[0]["model"],

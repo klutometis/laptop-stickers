@@ -1,7 +1,55 @@
 # sticker-pipeline
 
-Idea → prompt → image → monochrome → SVG, end-to-end. See
-`../plans/sticker-pipeline.md` for the full design.
+Next.js app that takes a vague idea and turns it into Cricut-ready sticker
+artwork — comparing multiple text and image models side-by-side, then preparing
+both **print-then-cut** and **single-color vinyl** outputs in one shot.
+
+See [`../plans/sticker-pipeline.md`](../plans/sticker-pipeline.md) for the
+end-to-end design and [`../plans/vectorization-modes.md`](../plans/vectorization-modes.md)
+for the rationale behind the two output tracks.
+
+## Pipeline
+
+1. **Idea** — free text + multi-select text models (Claude Opus 4.7, GPT-5.5,
+   Gemini 3.1 Pro). Each model produces a refined prompt, an aspect bucket
+   (`square` / `landscape` / `portrait` / `panorama` / `banner`), and a
+   one-line rationale.
+2. **Generate** — multi-select image models (Nano Banana 2, GPT Image 2),
+   pick *n*. Cartesian product: each refined prompt × each image model × *n*.
+   Aspect buckets map per-provider (Gemini `aspectRatio`, OpenAI `size`).
+3. **Pick** — click a thumbnail.
+4. **Prepare for Cricut** — fans out *four* parallel jobs across both image
+   models and both output tracks:
+
+   |              | **Cleanup PNG** (print-then-cut)            | **Vinyl SVG** (single-color cut)                  |
+   | ------------ | ------------------------------------------- | ------------------------------------------------- |
+   | Nano Banana 2 | AI flatten: drop shadow / paper-curl / faux-rim removed, sharp colored fills on pure white | AI monochrome → potrace `sharp` preset → inkscape trim |
+   | GPT Image 2  | same                                        | same                                              |
+
+   Each cell streams in independently and downloads as
+   `sticker-<model>-<track>.{png,svg}`.
+
+## Example
+
+A run on the idea *"Apollo with bow, art-nouveau"*, picking the Nano Banana 2
+result:
+
+| Cleanup PNG (print-then-cut)                      | Vinyl SVG (vinyl cut)                              |
+| ------------------------------------------------- | -------------------------------------------------- |
+| ![Apollo cleanup](docs/examples/sticker-nano-banana-2-cleanup.png) | ![Apollo vinyl](docs/examples/sticker-nano-banana-2-vinyl.svg) |
+
+The cleanup PNG sits on pure white with no faux-sticker rim — Cricut DSS's
+"Print Then Cut" auto-detect locks onto the colored region as the silhouette,
+and the **Offset** tool draws the actual sticker rim at whatever width you want.
+
+The vinyl SVG is a single compound path ready to drop into DSS for a one-color
+vinyl cut. `Path > Break Apart` in DSS gives you separable shapes for
+multi-shape stickers; `Weld` flattens it back.
+
+> Why two tracks instead of one? Print-then-cut preserves color and detail but
+> needs printable sticker paper. Vinyl cut is more durable and weatherproof but
+> reduces to a single silhouette. Generating both lets you decide *after*
+> seeing the result — the bottleneck is API latency, not human attention.
 
 ## Setup
 
@@ -28,20 +76,27 @@ picks them up directly — no `.env.local` needed. Otherwise, copy
 - `inkscape` (Ubuntu: `sudo apt install inkscape`)
 - `convert` from ImageMagick (Ubuntu: `sudo apt install imagemagick`)
 
-## Pipeline
+## Scripts
 
-1. **Idea** — free text + multi-select text models (Claude Opus 4.7, GPT-5.5,
-   Gemini 3.1 Pro). Refines into vinyl-cut-friendly prompts.
-2. **Generate** — multi-select image models (Nano Banana 2, GPT Image 2),
-   pick *n*. Cartesian product: each refined prompt × each image model × *n*.
-3. **Pick** — click a thumbnail in the grid.
-4. **Monochrome** — `sharp` threshold (0–255 slider).
-5. **Vectorize** — `potrace` (sharp preset by default) + `inkscape` trim.
-   Optional `Path > Break Apart` for multi-shape stickers.
-   Download the SVG → upload to Cricut Design Space → Weld in the UI.
+One-off test scripts in `scripts/` (used to validate each AI pass before wiring
+it into the route):
+
+- `monochrome-test.ts <input.png>` — run AI monochrome (NB2 + GPT Image 2) on
+  any input, save side-by-side outputs.
+- `cleanup-test.ts <input.png> [prompt]` — run AI cleanup on any input.
+
+```bash
+npx tsx scripts/cleanup-test.ts path/to/sticker.png
+```
+
+Outputs land next to the input as `<stem>-clean-<model>.png`. Test PNGs are
+gitignored.
 
 ## Notes
 
-- Concurrency is throttled to 4 cell-tasks at a time in the image route.
+- Cell-task concurrency in the image route is throttled to 4 at a time.
 - Gemini image models don't support the `n` API parameter; we call *n* times in
-  parallel (uniform pattern across providers).
+  parallel for uniformity across providers.
+- Old `/api/monochrome` (sharp threshold) and `/api/vectorize` (standalone
+  potrace) routes still exist but are no longer wired into the UI — kept as
+  fallbacks in case AI cleanup produces unusable output for some inputs.

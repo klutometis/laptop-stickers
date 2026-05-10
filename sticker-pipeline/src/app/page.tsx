@@ -15,6 +15,7 @@ import {
 import { readNdjson } from "@/lib/ndjson";
 import type { RefineEvent } from "./api/refine-prompt/route";
 import type { ImageEvent } from "./api/generate-images/route";
+import type { PrepareEvent } from "./api/prepare-cricut/route";
 
 type RefinedPrompt = {
   model: string;
@@ -37,6 +38,14 @@ type SelectedImage = {
   idx: number;
 };
 
+type PrepareCell = {
+  model: ImageModelKey;
+  track: "cleanup" | "vinyl";
+  png?: string; // base64 (cleanup track)
+  svg?: string; // SVG XML (vinyl track)
+  error?: string;
+};
+
 export default function Page() {
   // Step 1
   const [idea, setIdea] = useState("");
@@ -51,23 +60,16 @@ export default function Page() {
   const [selectedImageModels, setSelectedImageModels] = useState<
     ImageModelKey[]
   >([...IMAGE_MODEL_KEYS]);
-  const [n, setN] = useState(4);
+  const [n, setN] = useState(1);
   const [generating, setGenerating] = useState(false);
   const [grid, setGrid] = useState<Cell[] | null>(null);
 
-  // Step 3
+  // Step 3: pick image
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
-  const [threshold, setThreshold] = useState(128);
-  const [monochroming, setMonochroming] = useState(false);
-  const [monoBase64, setMonoBase64] = useState<string | null>(null);
 
-  // Step 4
-  const [preset, setPreset] = useState<"default" | "high" | "max" | "sharp">(
-    "sharp",
-  );
-  const [breakApart, setBreakApart] = useState(false);
-  const [vectorizing, setVectorizing] = useState(false);
-  const [svg, setSvg] = useState<string | null>(null);
+  // Step 4: Prepare for Cricut (cleanup PNG + monochrome→potrace SVG, per model)
+  const [preparing, setPreparing] = useState(false);
+  const [prepareGrid, setPrepareGrid] = useState<PrepareCell[] | null>(null);
 
   async function refine() {
     setRefining(true);
@@ -141,8 +143,7 @@ export default function Page() {
 
     setGenerating(true);
     setSelectedImage(null);
-    setMonoBase64(null);
-    setSvg(null);
+    setPrepareGrid(null);
 
     // Pre-seed empty grid so cells render immediately and fill in as images arrive
     const initialCells: Cell[] = [];
@@ -186,50 +187,54 @@ export default function Page() {
     }
   }
 
-  async function makeMonochrome() {
+  async function prepare() {
     if (!selectedImage) return;
-    setMonochroming(true);
-    setMonoBase64(null);
-    setSvg(null);
+    setPreparing(true);
+    // Pre-seed all 4 cells (NB2/gpt-image-2 × cleanup/vinyl). Cells fill in
+    // as events stream back.
+    const initial: PrepareCell[] = [];
+    for (const model of IMAGE_MODEL_KEYS) {
+      initial.push({ model, track: "cleanup" });
+      initial.push({ model, track: "vinyl" });
+    }
+    setPrepareGrid(initial);
+
     try {
-      const res = await fetch("/api/monochrome", {
+      const res = await fetch("/api/prepare-cricut", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ base64: selectedImage.base64, threshold }),
+        body: JSON.stringify({ base64: selectedImage.base64 }),
       });
-      const data = await res.json();
-      setMonoBase64(data.base64);
+      for await (const ev of readNdjson<PrepareEvent>(res)) {
+        setPrepareGrid((prev) =>
+          prev?.map((c) => {
+            if (c.model !== ev.model || c.track !== ev.track) return c;
+            if (ev.type === "png") return { ...c, png: ev.base64 };
+            if (ev.type === "svg") return { ...c, svg: ev.svg };
+            return { ...c, error: ev.error };
+          }) ?? null,
+        );
+      }
     } finally {
-      setMonochroming(false);
+      setPreparing(false);
     }
   }
 
-  async function vectorize() {
-    if (!monoBase64) return;
-    setVectorizing(true);
-    setSvg(null);
-    try {
-      const res = await fetch("/api/vectorize", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ base64: monoBase64, preset, breakApart }),
-      });
-      const data = await res.json();
-      setSvg(data.svg);
-    } finally {
-      setVectorizing(false);
-    }
-  }
-
-  function downloadSvg() {
-    if (!svg) return;
-    const blob = new Blob([svg], { type: "image/svg+xml" });
+  function downloadBlob(data: BlobPart, mime: string, filename: string) {
+    const blob = new Blob([data], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "sticker.svg";
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function downloadPng(base64: string, filename: string) {
+    const bin = atob(base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    downloadBlob(bytes, "image/png", filename);
   }
 
   // Group grid cells by promptModel for table-style rendering
@@ -478,98 +483,83 @@ export default function Page() {
         </Section>
       )}
 
-      {/* Step 4: monochrome */}
+      {/* Step 4: prepare for Cricut — cleanup PNGs and vinyl SVGs across both image models */}
       {selectedImage && (
-        <Section n={4} title="Monochrome">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm flex items-center gap-2">
-              threshold:
-              <input
-                type="range"
-                min={0}
-                max={255}
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
-              />
-              <span className="font-mono w-10">{threshold}</span>
-            </label>
+        <Section n={4} title="Prepare for Cricut">
+          <div className="flex flex-wrap items-center gap-3 mb-3">
+            <p className="text-sm text-gray-600 flex-1">
+              Runs both pathways across both image models in parallel:
+              <strong> cleanup</strong> (flat colored PNG, for print-then-cut on
+              sticker paper) and <strong>vinyl</strong> (AI monochrome → potrace
+              SVG, for single-color vinyl cut). Pick whichever cell looks best.
+            </p>
             <button
               className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={makeMonochrome}
-              disabled={monochroming}
+              onClick={prepare}
+              disabled={preparing}
             >
-              {monochroming ? "Processing…" : "Threshold"}
+              {preparing ? "Preparing…" : "Prepare for Cricut"}
             </button>
           </div>
-          <div className="flex gap-4 mt-3">
-            <div>
-              <div className="text-xs text-gray-500 mb-1">original</div>
-              <img
-                src={`data:image/png;base64,${selectedImage.base64}`}
-                alt=""
-                className="w-64 h-64 object-contain border"
-              />
-            </div>
-            {monoBase64 && (
-              <div>
-                <div className="text-xs text-gray-500 mb-1">monochrome</div>
-                <img
-                  src={`data:image/png;base64,${monoBase64}`}
-                  alt=""
-                  className="w-64 h-64 object-contain border"
-                />
-              </div>
-            )}
-          </div>
-        </Section>
-      )}
 
-      {/* Step 5: vectorize */}
-      {monoBase64 && (
-        <Section n={5} title="Vectorize">
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm flex items-center gap-1">
-              preset:
-              <select
-                value={preset}
-                onChange={(e) =>
-                  setPreset(e.target.value as typeof preset)
-                }
-                className="border rounded p-1 bg-background"
-              >
-                <option value="default">default</option>
-                <option value="high">high</option>
-                <option value="max">max</option>
-                <option value="sharp">sharp</option>
-              </select>
-            </label>
-            <Checkbox
-              label="Break apart compound path"
-              checked={breakApart}
-              onChange={setBreakApart}
-            />
-            <button
-              className="px-3 py-1 border rounded disabled:opacity-50"
-              onClick={vectorize}
-              disabled={vectorizing}
-            >
-              {vectorizing ? "Vectorizing…" : "Vectorize"}
-            </button>
-            {svg && (
-              <button
-                className="ml-auto px-3 py-1 border rounded"
-                onClick={downloadSvg}
-              >
-                Download SVG
-              </button>
-            )}
-          </div>
-          {svg && (
-            <div
-              className="mt-3 border bg-white"
-              style={{ maxHeight: 600, overflow: "auto" }}
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
+          {prepareGrid && (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left text-xs text-gray-500 pr-2">
+                      model ↓ / track →
+                    </th>
+                    <th className="text-left text-xs text-gray-500 px-2">
+                      cleanup PNG (print-then-cut)
+                    </th>
+                    <th className="text-left text-xs text-gray-500 px-2">
+                      vinyl SVG (AI monochrome → potrace)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {IMAGE_MODEL_KEYS.map((model) => {
+                    const cleanup = prepareGrid.find(
+                      (c) => c.model === model && c.track === "cleanup",
+                    );
+                    const vinyl = prepareGrid.find(
+                      (c) => c.model === model && c.track === "vinyl",
+                    );
+                    return (
+                      <tr key={model}>
+                        <td className="text-xs text-gray-500 pr-2 align-top pt-2">
+                          {IMAGE_MODELS[model].label}
+                        </td>
+                        <td className="px-2 py-2 align-top">
+                          <PrepareCleanupCell
+                            cell={cleanup}
+                            onDownload={(b64) =>
+                              downloadPng(
+                                b64,
+                                `sticker-${model}-cleanup.png`,
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="px-2 py-2 align-top">
+                          <PrepareVinylCell
+                            cell={vinyl}
+                            onDownload={(svg) =>
+                              downloadBlob(
+                                svg,
+                                "image/svg+xml",
+                                `sticker-${model}-vinyl.svg`,
+                              )
+                            }
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </Section>
       )}
@@ -594,6 +584,71 @@ function Section({
       </h2>
       {children}
     </section>
+  );
+}
+
+function PrepareCleanupCell({
+  cell,
+  onDownload,
+}: {
+  cell?: PrepareCell;
+  onDownload: (b64: string) => void;
+}) {
+  if (!cell) return null;
+  if (cell.error)
+    return (
+      <div className="text-red-600 text-xs p-2 border bg-red-50 max-w-xs">
+        {cell.error}
+      </div>
+    );
+  if (!cell.png)
+    return <div className="w-48 h-48 bg-gray-100 animate-pulse rounded" />;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <img
+        src={`data:image/png;base64,${cell.png}`}
+        alt=""
+        className="w-48 h-48 object-contain border bg-white"
+      />
+      <button
+        className="text-xs px-2 py-0.5 border rounded"
+        onClick={() => onDownload(cell.png!)}
+      >
+        Download PNG
+      </button>
+    </div>
+  );
+}
+
+function PrepareVinylCell({
+  cell,
+  onDownload,
+}: {
+  cell?: PrepareCell;
+  onDownload: (svg: string) => void;
+}) {
+  if (!cell) return null;
+  if (cell.error)
+    return (
+      <div className="text-red-600 text-xs p-2 border bg-red-50 max-w-xs">
+        {cell.error}
+      </div>
+    );
+  if (!cell.svg)
+    return <div className="w-48 h-48 bg-gray-100 animate-pulse rounded" />;
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <div
+        className="w-48 h-48 border bg-white p-1 [&_svg]:w-full [&_svg]:h-full"
+        dangerouslySetInnerHTML={{ __html: cell.svg }}
+      />
+      <button
+        className="text-xs px-2 py-0.5 border rounded"
+        onClick={() => onDownload(cell.svg!)}
+      >
+        Download SVG
+      </button>
+    </div>
   );
 }
 
