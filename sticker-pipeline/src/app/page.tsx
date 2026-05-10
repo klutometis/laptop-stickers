@@ -220,6 +220,17 @@ export default function Page() {
     }
   }
 
+  function slugify(s: string, max = 50): string {
+    const slug = s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "") // strip accents
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (!slug) return "sticker";
+    return slug.slice(0, max).replace(/-+$/, "");
+  }
+
   function downloadBlob(data: BlobPart, mime: string, filename: string) {
     const blob = new Blob([data], { type: mime });
     const url = URL.createObjectURL(blob);
@@ -537,7 +548,7 @@ export default function Page() {
                             onDownload={(b64) =>
                               downloadPng(
                                 b64,
-                                `sticker-${model}-cleanup.png`,
+                                `${slugify(idea)}-${model}-cleanup.png`,
                               )
                             }
                           />
@@ -549,7 +560,7 @@ export default function Page() {
                               downloadBlob(
                                 svg,
                                 "image/svg+xml",
-                                `sticker-${model}-vinyl.svg`,
+                                `${slugify(idea)}-${model}-vinyl.svg`,
                               )
                             }
                           />
